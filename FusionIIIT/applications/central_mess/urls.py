@@ -1,10 +1,12 @@
-from django.conf.urls import url
+from django.conf.urls import url, include
 
 from . import views
 
 app_name = 'mess'
 
 urlpatterns = [
+
+    url(r'^api/', include('applications.central_mess.api_urls')),
 
     url(r'^$', views.mess, name='mess'),
     url(r'^menurequest/', views.menu_change_request, name='menu_change_request'),

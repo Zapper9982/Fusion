@@ -1,4 +1,5 @@
 import datetime
+from django.contrib.auth.models import User
 from django.db import models
 from applications.academic_information.models import (Student, Holiday)
 
@@ -60,6 +61,18 @@ FEEDBACK_TYPE = (
     ('others', 'Others')
 )
 
+REQUEST_STATUS = (
+    ('pending', 'Pending'),
+    ('accept', 'Accepted'),
+    ('reject', 'Rejected'),
+    ('cancelled', 'Cancelled')
+)
+
+POLL_STATUS = (
+    ('open', 'Open'),
+    ('closed', 'Closed')
+)
+
 MONTHS = (
     ('Jan', 'January'),
     ('Feb', 'February'),
@@ -98,6 +111,64 @@ class Messinfo(models.Model):
 
     def __str__(self):
         return '{} - {}'.format(self.student_id.id, self.mess_option)
+
+
+class RegistrationRequest(models.Model):
+    student_id = models.ForeignKey(Student, on_delete=models.CASCADE)
+    mess_option = models.CharField(max_length=20, choices=MESS_OPTION)
+    start_date = models.DateField()
+    payment_date = models.DateField()
+    amount = models.PositiveIntegerField(default=0)
+    Txn_no = models.CharField(max_length=100)
+    img = models.FileField(upload_to='central_mess/registration_receipts/',
+                           blank=True, null=True)
+    registration_remark = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS,
+                              default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return '{} - {}'.format(self.student_id.id, self.status)
+
+
+class DeregistrationRequest(models.Model):
+    student_id = models.ForeignKey(Student, on_delete=models.CASCADE)
+    end_date = models.DateField()
+    deregistration_remark = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS,
+                              default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return '{} - {}'.format(self.student_id.id, self.status)
+
+
+class PaymentUpdateRequest(models.Model):
+    student_id = models.ForeignKey(Student, on_delete=models.CASCADE)
+    payment_date = models.DateField()
+    amount = models.PositiveIntegerField(default=0)
+    Txn_no = models.CharField(max_length=100)
+    img = models.FileField(upload_to='central_mess/payment_updates/',
+                           blank=True, null=True)
+    update_remark = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS,
+                              default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return '{} - {}'.format(self.student_id.id, self.status)
 
 
 class Mess_reg(models.Model):
@@ -141,6 +212,12 @@ class Payments(models.Model):
     sem = models.IntegerField()
     year = models.IntegerField(default=current_year)
     amount_paid = models.IntegerField(default=0)
+    payment_date = models.DateField(blank=True, null=True)
+    payment_month = models.CharField(max_length=20, blank=True, default='')
+    payment_year = models.IntegerField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS,
+                              default='accept')
+    Txn_no = models.CharField(max_length=100, blank=True, default='')
 
     class Meta:
         unique_together = (('student_id', 'sem', 'year'),)
@@ -160,6 +237,58 @@ class Menu(models.Model):
                                      self.meal_time, self.dish)
 
 
+class MenuPoll(models.Model):
+    question = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    mess_option = models.CharField(max_length=20, choices=MESS_OPTION)
+    meal_time = models.CharField(max_length=20, choices=MEAL,
+                                 blank=True, null=True)
+    poll_date = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=POLL_STATUS,
+                              default='open')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL,
+                                   blank=True, null=True,
+                                   related_name='menu_polls_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return '{} - {}'.format(self.mess_option, self.question)
+
+
+class MenuPollOption(models.Model):
+    poll = models.ForeignKey(MenuPoll, on_delete=models.CASCADE,
+                             related_name='options')
+    option_text = models.CharField(max_length=200)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ('display_order', 'id')
+        unique_together = (('poll', 'option_text'),)
+
+    def __str__(self):
+        return '{} - {}'.format(self.poll_id, self.option_text)
+
+
+class MenuPollVote(models.Model):
+    poll = models.ForeignKey(MenuPoll, on_delete=models.CASCADE,
+                             related_name='votes')
+    option = models.ForeignKey(MenuPollOption, on_delete=models.CASCADE,
+                               related_name='votes')
+    student_id = models.ForeignKey(Student, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = (('poll', 'student_id'),)
+
+    def __str__(self):
+        return '{} - {}'.format(self.poll_id, self.student_id.id)
+
+
 class Rebate(models.Model):
     student_id = models.ForeignKey(Student, on_delete=models.CASCADE)
     start_date = models.DateField(default=datetime.date.today)
@@ -168,6 +297,7 @@ class Rebate(models.Model):
     status = models.CharField(max_length=20, choices=STATUS, default='1')
     app_date = models.DateField(default=datetime.date.today)
     leave_type = models.CharField(choices=LEAVE_TYPE, max_length=20, default="casual")
+    rebate_remark = models.TextField(blank=True, default='')
     # leave_document = models.FileField(upload_to='central_mess/')
 
     def __str__(self):
@@ -217,6 +347,7 @@ class Special_request(models.Model):
     item1 = models.CharField(max_length=50)
     item2 = models.CharField(max_length=50)
     app_date = models.DateField(default=datetime.date.today)
+    special_request_remark = models.TextField(blank=True, default='')
 
     def __str__(self):
         return str(self.student_id.id)
@@ -259,6 +390,7 @@ class Feedback(models.Model):
     fdate = models.DateField(default=datetime.date.today)
     description = models.TextField()
     feedback_type = models.CharField(max_length=20, choices=FEEDBACK_TYPE)
+    is_read = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.student_id.id)

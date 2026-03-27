@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import (Feedback, Menu, Menu_change_request, Mess_meeting,
+from .models import (Feedback, Menu, MenuPoll, MenuPollOption,
+                     MenuPollVote, Menu_change_request, Mess_meeting,
                      Mess_minutes, Mess_reg, Messinfo, Monthly_bill,
                      Nonveg_data, Nonveg_menu, Payments, Rebate,
                      Special_request, Vacation_food,MessBillBase)
@@ -36,6 +37,40 @@ class MenuAdmin(admin.ModelAdmin):
         ('dish', {'fields': ['dish']}),
         ]
     list_display = ('mess_option', 'meal_time', 'dish')
+
+
+class MenuPollAdmin(admin.ModelAdmin):
+    model = MenuPoll
+    fieldsets = [
+        ('question', {'fields': ['question']}),
+        ('description', {'fields': ['description']}),
+        ('mess_option', {'fields': ['mess_option']}),
+        ('meal_time', {'fields': ['meal_time']}),
+        ('poll_date', {'fields': ['poll_date']}),
+        ('status', {'fields': ['status']}),
+        ('created_by', {'fields': ['created_by']}),
+    ]
+    list_display = ('question', 'mess_option', 'meal_time', 'poll_date', 'status')
+
+
+class MenuPollOptionAdmin(admin.ModelAdmin):
+    model = MenuPollOption
+    fieldsets = [
+        ('poll', {'fields': ['poll']}),
+        ('option_text', {'fields': ['option_text']}),
+        ('display_order', {'fields': ['display_order']}),
+    ]
+    list_display = ('poll', 'option_text', 'display_order')
+
+
+class MenuPollVoteAdmin(admin.ModelAdmin):
+    model = MenuPollVote
+    fieldsets = [
+        ('poll', {'fields': ['poll']}),
+        ('option', {'fields': ['option']}),
+        ('student_id', {'fields': ['student_id']}),
+    ]
+    list_display = ('poll', 'option', 'student_id', 'created_at')
 
 
 class Mess_regAdmin(admin.ModelAdmin):
@@ -188,6 +223,9 @@ class MessBillBaseAdmin(admin.ModelAdmin):
 admin.site.register(Mess_minutes, Mess_minutesAdmin),
 admin.site.register(Messinfo, MessinfoAdmin),
 admin.site.register(Menu, MenuAdmin),
+admin.site.register(MenuPoll, MenuPollAdmin),
+admin.site.register(MenuPollOption, MenuPollOptionAdmin),
+admin.site.register(MenuPollVote, MenuPollVoteAdmin),
 admin.site.register(Mess_reg, Mess_regAdmin),
 admin.site.register(Monthly_bill, Monthly_billAdmin),
 admin.site.register(Payments, PaymentsAdmin),

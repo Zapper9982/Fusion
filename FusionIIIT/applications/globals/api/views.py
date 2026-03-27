@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from applications.academic_information.models import Student
 from applications.eis.api.views import profile as eis_profile
-from applications.globals.models import (HoldsDesignation,Designation)
+from applications.globals.models import (HoldsDesignation,Designation, ExtraInfo)
 from applications.gymkhana.api.views import coordinator_club
 from applications.placement_cell.models import (Achievement, Course, Education,
                                                 Experience, Has, Patent,
@@ -23,6 +23,33 @@ from notifications.models import Notification
 
 User = get_user_model()
 
+
+def _get_designation_names(user):
+    designation_list = list(
+        HoldsDesignation.objects.filter(working=user).values_list('designation__name', flat=True)
+    )
+    return [str(name) for name in designation_list]
+
+
+def _build_auth_payload(user):
+    extrainfo = ExtraInfo.objects.select_related('user').filter(user=user).first()
+    designation_info = _get_designation_names(user)
+    full_name = "{} {}".format(user.first_name, user.last_name).strip() or user.username
+    accessible_modules = {}
+    for designation in designation_info:
+        accessible_modules[designation] = {}
+
+    return {
+        'name': full_name,
+        'username': user.username,
+        'roll_no': extrainfo.id if extrainfo else user.username,
+        'designation_info': designation_info,
+        'desgination_info': designation_info,
+        'accessible_modules': accessible_modules,
+        'last_selected_role': designation_info[0] if designation_info else None,
+        'user_type': extrainfo.user_type if extrainfo else None,
+    }
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
@@ -33,7 +60,8 @@ def login(request):
     resp = {
         'success' : 'True',
         'message' : 'User logged in successfully',
-        'token' : data['auth_token']
+        'token' : data['auth_token'],
+        'user': _build_auth_payload(user),
     }
     return Response(data=resp, status=status.HTTP_200_OK)
 
@@ -70,6 +98,34 @@ def dashboard(request):
     }
 
     return Response(data=resp,status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def auth_me(request):
+    return Response(data=_build_auth_payload(request.user), status=status.HTTP_200_OK)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def update_role(request):
+    requested_role = request.data.get('last_selected_role')
+    designation_info = _get_designation_names(request.user)
+    if requested_role and requested_role not in designation_info:
+        return Response(
+            {'message': 'Requested role is not assigned to this user.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(
+        {
+            'message': 'Role updated successfully.',
+            'last_selected_role': requested_role or (designation_info[0] if designation_info else None),
+        },
+        status=status.HTTP_200_OK,
+    )
 
 @api_view(['GET'])
 def profile(request, username=None):
